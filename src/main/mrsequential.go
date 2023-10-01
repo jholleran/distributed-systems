@@ -28,6 +28,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	log.Printf("Input files: %v", os.Args[2:])
+
 	mapf, reducef := loadPlugin(os.Args[1])
 
 	//
@@ -47,6 +49,9 @@ func main() {
 		}
 		file.Close()
 		kva := mapf(filename, string(content))
+
+		log.Printf("Map KVA: %v", kva)
+
 		intermediate = append(intermediate, kva...)
 	}
 
@@ -57,6 +62,8 @@ func main() {
 	//
 
 	sort.Sort(ByKey(intermediate))
+
+	log.Printf("Intermediate: %v", intermediate)
 
 	oname := "mr-out-0"
 	ofile, _ := os.Create(oname)
@@ -75,6 +82,9 @@ func main() {
 		for k := i; k < j; k++ {
 			values = append(values, intermediate[k].Value)
 		}
+
+		log.Printf("Reduce Key: %v: Values: %v", intermediate[i].Key, values)
+
 		output := reducef(intermediate[i].Key, values)
 
 		// this is the correct format for each line of Reduce output.
