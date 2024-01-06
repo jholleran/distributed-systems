@@ -249,7 +249,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	// if RPC request contains term T > currentTerm: set currentTerm = T, convert to follower
 
 	if args.Term > rf.currentTerm {
-		log.Printf("[%d]... term out of date in AppendEntries. currentTerm := %d, incoming term := %d", rf.me, rf.currentTerm, args.Term)
+		DPrintf("[%d]... term out of date in AppendEntries. currentTerm := %d, incoming term := %d", rf.me, rf.currentTerm, args.Term)
 		rf.becomeFollower(args.Term)
 	}
 
@@ -258,7 +258,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	if rf.currentTerm == args.Term {
 		//log.Printf("[%d]... state is: %v", rf.me, rf.state)
 		if rf.state != Follower {
-			log.Printf("[%d]... in same term but not a follower", rf.me)
+			DPrintf("[%d]... in same term but not a follower", rf.me)
 			rf.becomeFollower(args.Term)
 		}
 
@@ -297,15 +297,15 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 			// - newEntriesIndex points at the end of Entries, or an index where the
 			//   term mismatches with the corresponding log entry
 			if newEntriesIndex < len(args.Entries) {
-				log.Printf("[%d]... inserting entries %v from index %d", rf.me, args.Entries[newEntriesIndex:], logInsertIndex)
+				//log.Printf("[%d]... inserting entries %v from index %d", rf.me, args.Entries[newEntriesIndex:], logInsertIndex)
 				rf.log = append(rf.log[:logInsertIndex], args.Entries[newEntriesIndex:]...)
-				log.Printf("[%d]... log is now: %v", rf.me, rf.log)
+				DPrintf("[%d]... log is now: %v", rf.me, rf.log)
 			}
 
 			// Set commit index.
 			if args.LeaderCommit > rf.commitIndex {
 				rf.commitIndex = intMin(args.LeaderCommit, len(rf.log)-1)
-				log.Printf("[%d]... setting commitIndex=%d", rf.me, rf.commitIndex)
+				DPrintf("[%d]... setting commitIndex=%d", rf.me, rf.commitIndex)
 				rf.newCommitReadyChan <- struct{}{}
 			}
 		}
@@ -374,21 +374,17 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 
 	// Your code here (2B).
 
-	//log.Printf("[%d] before start lock", rf.me)
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
-	//log.Printf("[%d] after start lock", rf.me)
 	//
 	if rf.state == Leader {
-		log.Printf("[%d] received start command: %v", rf.me, command)
+		//log.Printf("[%d] received start command: %v", rf.me, command)
 		isLeader = true
 		term = rf.currentTerm
 		index = len(rf.log)
 		rf.log = append(rf.log, LogEntry{Command: command, Term: rf.currentTerm, Index: index})
 
-		//log.Printf("[%d] before persisting state", rf.me)
 		rf.persist();
-		//log.Printf("[%d] after persisting state", rf.me)
 		//log.Printf("[%d]... log=%v", rf.me, rf.log)
 	}
 
@@ -500,7 +496,7 @@ func (rf *Raft) sendHeartbeatToAll() {
 										matchCount++
 									}
 									if matchCount*2 > len(rf.peers) {
-										log.Printf("[%d] leader has replicated the entry on a majority.  commitIndex := %d, nodes := %d", rf.me, i, matchCount)
+										DPrintf("[%d] leader has replicated the entry on a majority.  commitIndex := %d, nodes := %d", rf.me, i, matchCount)
 										rf.commitIndex = i
 									}
 								}
@@ -508,9 +504,7 @@ func (rf *Raft) sendHeartbeatToAll() {
 						}
 
 						if rf.commitIndex != savedCommitIndex {
-							log.Printf("[%d] leader before commit channel", rf.me)
 							rf.newCommitReadyChan <- struct{}{}
-							log.Printf("[%d] leader after commit channel", rf.me)
 						}
 					} else {
 						rf.nextIndex[peer] = ni - 1
@@ -528,9 +522,7 @@ func (rf *Raft) sendHeartbeatToAll() {
 func (rf *Raft) commitChanSender() {
 	for range rf.newCommitReadyChan {
 
-		//log.Printf("[%d] commitChanSender starting", rf.me)
 		rf.mu.Lock()
-		//log.Printf("[%d] commitChanSender after lock", rf.me)
 
 		// Find which entries we have to apply.
 		savedLastApplied := rf.lastApplied
@@ -540,7 +532,7 @@ func (rf *Raft) commitChanSender() {
 			rf.lastApplied = rf.commitIndex
 		}
 
-		log.Printf("[%d] commitChanSender entries=%v, savedLastApplied=%d", rf.me, entries, savedLastApplied)
+		DPrintf("[%d] commitChanSender entries=%v, savedLastApplied=%d", rf.me, entries, savedLastApplied)
 		rf.mu.Unlock()
 
 		for i, entry := range entries {
@@ -551,7 +543,7 @@ func (rf *Raft) commitChanSender() {
 			}
 		}
 	}
-	log.Printf("commitChanSender done")
+	DPrintf("commitChanSender done")
 }
 
 func attemptElection(rf *Raft) {
@@ -709,7 +701,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.matchIndex = make(map[int]int)
 
 	rf.applyCh = applyCh
-	rf.newCommitReadyChan = make(chan struct{}, 16)
+	rf.newCommitReadyChan = make(chan struct{}, 16000) // HACK for now but this causes locking
 
 	// Initialize the first entry to empty
 	rf.log = append(rf.log, EMPTY_ENTRY)
