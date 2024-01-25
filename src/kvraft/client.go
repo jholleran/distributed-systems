@@ -72,11 +72,11 @@ func (ck *Clerk) GetFromServer(args GetArgs, serverId int) (string, bool) {
 	reply := GetReply{}
 	//log.Printf("Clerk get key:[%v] from server:%d", key, serverId)
 	if ok := ck.servers[serverId].Call("KVServer.Get", &args, &reply); ok && len(reply.Err) == 0 {
-		DPrintf("Clerk found key:[%v] with value:[%v] from server:%d", args.Key, reply.Value, serverId)
+		DPrintf("Clerk:%v found key:[%v] with value:[%v] from server:%d", ck.id, args.Key, reply.Value, serverId)
 		ck.lastKnownLeaderId = serverId
 		return reply.Value, true
 	} else {
-		DPrintf("Clerk get failed to server:%d. Reply: %v", serverId, reply)
+		TPrintf("Clerk:%v failed to get key:[%v] to server:%d. Reply: %v", ck.id, args.Key, serverId, reply)
 		ck.lastKnownLeaderId = -1
 	}
 
@@ -118,11 +118,11 @@ func (ck *Clerk) PutAppendFromServer(args PutAppendArgs, serverId int) bool {
 	reply := PutAppendReply{}
 	//log.Printf("Clerk put append key:[%v], value:[%v] from server:%d", key, value, serverId)
 	if ok := ck.servers[serverId].Call("KVServer.PutAppend", &args, &reply); ok && len(reply.Err) == 0 {
-		DPrintf("Clerk put append key:[%v], value:[%v] to server:%d", args.Key, args.Value, serverId)
+		DPrintf("Clerk:%v put append key:[%v], value:[%v] to server:%d", ck.id, args.Key, args.Value, serverId)
 		ck.lastKnownLeaderId = serverId
 		return true
 	} else {
-		DPrintf("Clerk put append failed to server:%d. Reply: %v", serverId, reply)
+		TPrintf("Clerk:%v failed to put append key:[%v], value:[%v] to server:%d. Reply: %v", ck.id, args.Key, args.Value, serverId, reply)
 		ck.lastKnownLeaderId = -1
 	}
 

@@ -120,6 +120,7 @@ func (rf *Raft) GetState() (int, bool) {
 // after you've implemented snapshots, pass the current snapshot
 // (or nil if there's not yet a snapshot).
 func (rf *Raft) persist() {
+	// log.Printf("[%d] persisting state. log length: %d", rf.me, len(rf.log))
 	w := new(bytes.Buffer)
 	e := labgob.NewEncoder(w)
 	e.Encode(rf.commitIndex)
@@ -142,7 +143,6 @@ func (rf *Raft) readPersist(data []byte) {
 		log.Fatal("Unable to read raft state.")
 	} else {
 		rf.currentTerm = rf.log[len(rf.log) - 1].Term
-		rf.lastApplied = rf.commitIndex
 	}
 }
 
@@ -570,7 +570,6 @@ func attemptElection(rf *Raft) {
 	lastLogIndex := len(rf.log)
 	lastLogTerm := -1
 	if lastLogIndex != 0 && len(rf.log) > 1 {
-		//log.Printf("%v", rf.log)
 		lastLogTerm = rf.log[len(rf.log)-1].Term
 	}
 
@@ -596,7 +595,7 @@ func attemptElection(rf *Raft) {
 			defer rf.mu.Unlock()
 
 			if reply.Term > term {
-				log.Printf("[%d] term is out of date in reply. save term:%d, %+v", rf.me, term, reply)
+				ElectionPrintf("[%d] term is out of date in reply. save term:%d, %+v", rf.me, term, reply)
 				rf.becomeFollower(reply.Term)
 				return
 			}
@@ -666,7 +665,7 @@ func (rf *Raft) startLeader(term int) {
 	rf.state = Leader
 	rf.currentTerm = term
 
-	log.Printf("[%d] is now the Leader in term: %d", rf.me, rf.currentTerm)
+	DPrintf("[%d] is now the Leader in term: %d, log length: %d", rf.me, rf.currentTerm, len(rf.log))
 
 	go rf.sendHeartbeatToAll()
 }
