@@ -86,6 +86,8 @@ type Raft struct {
 	// volatile state on leaders
 	nextIndex  map[int]int
 	matchIndex map[int]int
+
+	indexOffset int
 }
 
 const (
@@ -125,7 +127,7 @@ func (rf *Raft) persist() {
 	e := labgob.NewEncoder(w)
 	e.Encode(rf.commitIndex)
 	e.Encode(rf.votedFor)
-	e.Encode(rf.log)
+	e.Encode(rf.log[rf.indexOffset:])
 	raftstate := w.Bytes()
 	rf.persister.Save(raftstate, nil)
 }
@@ -704,6 +706,8 @@ func Make(peers []*labrpc.ClientEnd, me int,
 
 	// Initialize the first entry to empty
 	rf.log = append(rf.log, EMPTY_ENTRY)
+
+	rf.indexOffset = 0
 
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
