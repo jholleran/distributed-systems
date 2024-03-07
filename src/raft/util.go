@@ -6,7 +6,7 @@ import "log"
 const Debug = false
 const ElectionDebug = false
 const HeartbeatDebug = false
-const AppendEntriesDebug = false
+const AppendEntriesDebug = true
 
 func DPrintf(format string, a ...interface{}) (n int, err error) {
 	if Debug {

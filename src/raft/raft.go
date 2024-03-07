@@ -127,7 +127,7 @@ func (rf *Raft) persist() {
 	e := labgob.NewEncoder(w)
 	e.Encode(rf.commitIndex)
 	e.Encode(rf.votedFor)
-	e.Encode(rf.log[rf.indexOffset:])
+	e.Encode(rf.log)
 	raftstate := w.Bytes()
 	rf.persister.Save(raftstate, nil)
 }
@@ -155,6 +155,18 @@ func (rf *Raft) readPersist(data []byte) {
 func (rf *Raft) Snapshot(index int, snapshot []byte) {
 	// Your code here (2D).
 
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	// discard log before index
+	remainder := rf.log[index:]
+	rf.log = []LogEntry{EMPTY_ENTRY}
+	rf.log = append(rf.log, remainder...)
+
+	// index offset is now set to the index of the last snapshot
+	rf.indexOffset = index
+
+	//log.Printf(" snapshot created at index: %d, log: %v", index, rf.log)
 }
 
 // example RequestVote RPC arguments structure.
@@ -448,10 +460,12 @@ func (rf *Raft) sendHeartbeatToAll() {
 				prevLogIndex := ni - 1
 				prevLogTerm := -1
 				if prevLogIndex >= 0 {
-					prevLogTerm = rf.log[prevLogIndex].Term
+					log.Printf(" heatbeat - prevLogIndex: %d, peer: %d, offset: %d, log: %v", prevLogIndex, peer, rf.indexOffset, rf.log)
+					log.Printf("   - actual log index: %d", prevLogIndex - rf.indexOffset)
+					prevLogTerm = rf.log[prevLogIndex - rf.indexOffset + 1].Term
 				}
 
-				entries := rf.log[ni:]
+				entries := rf.log[ni - rf.indexOffset + 1:]
 
 				args := &AppendEntriesArgs{
 					Term:             term,
@@ -484,7 +498,7 @@ func (rf *Raft) sendHeartbeatToAll() {
 					if reply.Success {
 						rf.nextIndex[peer] = ni + len(entries)
 						rf.matchIndex[peer] = rf.nextIndex[peer] - 1
-						AppendEntriesPrintf("[%d] AppendEntries reply from: %d success: nextIndex := %v, matchIndex := %v", rf.me, peer, rf.nextIndex, rf.matchIndex)
+						AppendEntriesPrintf("[%d] AppendEntries reply from: %d success: nextIndex := %v, matchIndex := %v", rf.me, peer, rf.nextIndex[peer], rf.matchIndex[peer])
 
 						savedCommitIndex := rf.commitIndex
 						for i := rf.commitIndex + 1; i < len(rf.log); i++ {
@@ -538,6 +552,13 @@ func (rf *Raft) commitChanSender() {
 		rf.mu.Unlock()
 
 		for i, entry := range entries {
+
+			// don't apply the empty entry
+			// TODO: try and remove the need for the empty entry
+			if entry == EMPTY_ENTRY {
+				continue
+			}
+
 			rf.applyCh <- ApplyMsg{
 				Command:      entry.Command,
 				CommandIndex: savedLastApplied + i + 1,
@@ -707,7 +728,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	// Initialize the first entry to empty
 	rf.log = append(rf.log, EMPTY_ENTRY)
 
-	rf.indexOffset = 0
+	rf.indexOffset = 1
 
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
